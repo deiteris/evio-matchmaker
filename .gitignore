@@ -1,0 +1,4 @@
+__pycache__
+bot.db
+migrations
+config.json
