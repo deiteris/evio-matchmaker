@@ -1,8 +1,9 @@
+import websockets.client
 from .mm.lobby import MATCH_INFO_MAP, MMR_DIFF_THRESHOLD, MAPS_POOL, CustomLobby, MatchmakingLobby, get_avg_team_mmr
 from custom_types import MatchmakingBot
 from uuid import uuid4
 from datetime import datetime
-from json import loads
+from json import loads, dumps
 from sqlite3 import IntegrityError
 from discord import Client, app_commands, Interaction, ui, ButtonStyle, Client, Embed, Color, User, SelectOption, Message
 from discord.emoji import Emoji
@@ -16,8 +17,9 @@ from aiohttp import ClientSession, BasicAuth
 from random import choice, shuffle
 from traceback import format_exc
 from table2ascii import table2ascii
+from urllib.parse import quote
 
-from .api import EvioMap, EvioApiClient
+from .api import EvioMap, EvioApiClient, EvioUserInfo
 from .db import EvioDB, League, GameMode, DBHistoricalMatch, MatchStatusEnum, MatchmakingRegionEnum
 
 
@@ -669,6 +671,64 @@ class LeaderboardScreen(View):
         self.pos = pos
         await interaction.response.edit_message(content=None, embed=self.render_info(data))
 
+# -------------
+
+class VerifyModal(ui.Modal):
+
+    def __init__(self, db: EvioDB, player: EvioUserInfo, is_created: bool):
+        super().__init__(title='Verification')
+
+        self.player = player
+        self.db = db
+        self.is_created = is_created
+        self.party_code = ui.TextInput(label='Create a party in ev.io and enter your party code', required=True)
+        self.add_item(self.party_code)
+
+
+    async def on_submit(self, interaction: Interaction):
+        data = {
+            "namespace": "prod2",
+            "clientMetadata": "",
+            "joinKind": {
+                "type": "Existing",
+                "partyQuery": {
+                    "type": "Alias",
+                    "alias": self.party_code.value
+                },
+                "createPlayerToken": False
+            }
+        }
+        url = f'wss://matchmaker2.ev.io/party/ws?req={quote(dumps(data))}'
+        async with websockets.client.connect(url) as ws:
+            msg: dict = loads(await ws.recv())
+            msg_type = msg['type']
+            if msg_type == 'Error':
+                await interaction.response.send_message(f'Failed to join party. Reason: {msg["message"]}', ephemeral=True)
+            elif msg_type == 'Init':
+                leader = next((True for member in msg['state']['members'] if member['isLeader'] and self.player['name'][0]['value'] == loads(member['serverMetadata'])['username']), None)
+                if leader is None:
+                    await interaction.response.send_message("Leader of the lobby does not match the specified username.", ephemeral=True)
+                    return
+
+                if self.is_created:
+                    try:
+                        self.db.update_player_registration(self.player['uid'][0]['value'], interaction.user.id)
+                        await interaction.response.send_message("You've been registered successfully.", ephemeral=True)
+                    except IntegrityError as e:
+                        print(e)
+                        await interaction.response.send_message("Something went wrong when trying to register.", ephemeral=True)
+                    return
+
+                try:
+                    self.db.register_player(self.player, interaction.user.id)
+                    await interaction.response.send_message("You've been registered successfully.", ephemeral=True)
+                except IntegrityError as e:
+                    print(e)
+                    await interaction.response.send_message("Something went wrong when trying to register.", ephemeral=True)
+            else:
+                print(msg)
+                await interaction.response.send_message('Unexpected message received from ev.io.')
+
 
 class Evio(commands.Cog):
 
@@ -805,29 +865,22 @@ class Evio(commands.Cog):
             await interaction.response.send_message("You're already registered.", ephemeral=True)
             return
 
-        await interaction.response.defer()
-
         player = await self.api.get_user_info_by_name(evio_username)
         if not player:
-            await interaction.followup.send("Couldn't find ev.io user with such username.", ephemeral=True)
+            await interaction.response.send_message("Couldn't find ev.io user with such username.", ephemeral=True)
             return
 
-        db_player = self.db.get_player(player['uid'][0]['value'], 'COUNT(1) as count')
-        if db_player['count']:
-            try:
-                self.db.update_player_registration(player['uid'][0]['value'], interaction.user.id)
-                await interaction.followup.send("You've been registered successfully.", ephemeral=True)
-            except IntegrityError as e:
-                print(e)
-                await interaction.followup.send("Something went wrong when trying to register.", ephemeral=True)
-            return
+        uid = player['uid'][0]['value']
+        db_player = self.db.get_player(uid, 'i.discord_id')
+        is_created = False
+        if db_player is not None:
+            discord_id = db_player['discord_id']
+            if discord_id is not None and discord_id != interaction.user.id:
+                await interaction.response.send_message("The player with this username is already registered.", ephemeral=True)
+                return
+            is_created = True
 
-        try:
-            self.db.register_player(player, interaction.user.id)
-            await interaction.followup.send("You've been registered successfully.", ephemeral=True)
-        except IntegrityError as e:
-            print(e)
-            await interaction.followup.send("Something went wrong when trying to register.", ephemeral=True)
+        await interaction.response.send_modal(VerifyModal(self.db, player, is_created))
 
 
     @app_commands.command(name='unregister')

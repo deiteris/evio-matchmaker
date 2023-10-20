@@ -287,7 +287,7 @@ class EvioDB:
 
 
     def get_player(self, user_id: int, *fields: str) -> DBPlayer | None:
-        return self.db.execute(f'SELECT {",".join(fields)} FROM {TABLE_PREFIX}_players WHERE user_id = ?', (user_id,)).fetchone()
+        return self.db.execute(f'SELECT {",".join(fields)} FROM {TABLE_PREFIX}_players AS p LEFT JOIN {TABLE_PREFIX}_discord_integration AS i ON i.user_id = p.user_id WHERE p.user_id = ?', (user_id,)).fetchone()
 
 
     def get_players(self, *fields: str) -> list[DBPlayer]:
