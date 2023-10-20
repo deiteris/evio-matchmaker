@@ -339,7 +339,7 @@ class CustomLobbyScreen(View):
         if len(self.lobby.teams[0]['players']) == 0 or len(self.lobby.teams[1]['players']) == 0:
             await interaction.response.send_message("Cannot start with empty teams.", ephemeral=True)
             return
-        if self.lobby.mode is GameMode.Competitive and not self.lobby.is_full():
+        if self.lobby.league is not League.Custom and not self.lobby.is_full():
             await interaction.response.send_message("Teams must be full in order to start.", ephemeral=True)
             return
         match_id = await self.lobby.start()
