@@ -346,7 +346,7 @@ class EvioDB:
         return self.db.execute(f'SELECT {",".join(fields)} FROM {TABLE_PREFIX}_player_settings WHERE user_id = ?', (user_id,)).fetchone()
 
 
-    def set_player_settings(self, user_id: int, *, regions: list[str] | None = None, maps: list[int] | None = None):
+    def set_player_settings(self, user_id: int, *, regions: list[int] | None = None, maps: list[int] | None = None):
         if regions is None and maps is None:
             return
         query = []
