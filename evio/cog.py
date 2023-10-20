@@ -602,7 +602,7 @@ class HistoryScreen(View):
             await interaction.response.edit_message(content='Cannot navigate past the first page.')
             return
         self.pos = pos
-        await interaction.response.edit_message(embed=self.render_info(self.matches[pos]))
+        await interaction.response.edit_message(content=None, embed=self.render_info(self.matches[pos]))
 
 
     @ui.button(label="Next", style=ButtonStyle.gray)
@@ -612,7 +612,7 @@ class HistoryScreen(View):
             await interaction.response.edit_message(content='Cannot navigate past the last page.')
             return
         self.pos = pos
-        await interaction.response.edit_message(embed=self.render_info(self.matches[pos]))
+        await interaction.response.edit_message(content=None, embed=self.render_info(self.matches[pos]))
 
 
 class Evio(commands.Cog):
