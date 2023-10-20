@@ -125,7 +125,7 @@ async def main():
         bot.db.execute('PRAGMA foreign_keys=ON')
         bot.db.row_factory = sqlite3.Row
 
-        await bot.add_cog(evio.Evio(bot, client, credentials, 'https://john-doe.xyz:8080/matchCallback'))
+        await bot.add_cog(evio.Evio(bot, client, credentials, cfg['callback_url']))
         await bot.start(cfg['token'])
 
 if __name__ == '__main__':
