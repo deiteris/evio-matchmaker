@@ -840,3 +840,37 @@ class Evio(commands.Cog):
 
         self.db.remove_player(interaction.user.id)
         await interaction.response.send_message("You've been unregistered successfully.", ephemeral=True)
+
+
+    @app_commands.command(name='leave')
+    async def evio_leave(self, interaction: Interaction):
+        """Removes from any lobby you currently participate"""
+        player = self.db.get_player_by_discord_id(interaction.user.id, 'COUNT(1) as count')
+        if not player['count']:
+            await interaction.response.send_message('You are not registered.', ephemeral=True)
+            return
+
+        # TODO: Refactor
+        kv = next((lobby for lobby in self.bot.lobbies.items() if interaction.user.id in lobby[1].discord_player_map), None)
+        if not kv:
+            await interaction.response.send_message('You are not present in any lobby.', ephemeral=True)
+            return
+        lobby_key, lobby = kv
+        lobby.leave(interaction.user.id)
+        async with self.bot.lobbies_lock:
+            del self.bot.lobbies[lobby_key]
+        msgs = list(lobby.user_messages.values())
+        match lobby:
+            case CustomLobby():
+                await msgs[0].delete()
+                return await interaction.response.send_message("You've been removed from the lobby.", ephemeral=True)
+            case MatchmakingLobby():
+                if len(msgs) == 1:
+                    await msgs[0].delete()
+                else:
+                    for msg in msgs:
+                        try:
+                            await msg.edit(embed=lobby.render_info(True, False))
+                        except:
+                            print(format_exc())
+                return await interaction.response.send_message("You've been removed from the lobby.", ephemeral=True)
