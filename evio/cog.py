@@ -673,6 +673,20 @@ class LeaderboardScreen(View):
 
 # -------------
 
+class VerifyView(View):
+
+    def __init__(self, db: EvioDB, player: EvioUserInfo, is_created: bool):
+        super().__init__(timeout=None)
+        self.db = db
+        self.player = player
+        self.is_created = is_created
+
+
+    @ui.button(label="Verify", style=ButtonStyle.gray)
+    async def verify(self, interaction: Interaction, _: ui.Button):
+        await interaction.response.send_modal(VerifyModal(self.db, self.player, self.is_created))
+
+
 class VerifyModal(ui.Modal):
 
     def __init__(self, db: EvioDB, player: EvioUserInfo, is_created: bool):
@@ -703,31 +717,31 @@ class VerifyModal(ui.Modal):
             msg: dict = loads(await ws.recv())
             msg_type = msg['type']
             if msg_type == 'Error':
-                await interaction.response.send_message(f'Failed to join party. Reason: {msg["message"]}', ephemeral=True)
+                await interaction.response.edit_message(content=f'Failed to join party. Reason: {msg["message"]}', view=None)
             elif msg_type == 'Init':
                 leader = next((True for member in msg['state']['members'] if member['isLeader'] and self.player['name'][0]['value'] == loads(member['serverMetadata'])['username']), None)
                 if leader is None:
-                    await interaction.response.send_message("Leader of the lobby does not match the specified username.", ephemeral=True)
+                    await interaction.response.edit_message(content="Leader of the lobby does not match the specified username.", view=None)
                     return
 
                 if self.is_created:
                     try:
                         self.db.update_player_registration(self.player['uid'][0]['value'], interaction.user.id)
-                        await interaction.response.send_message("You've been registered successfully.", ephemeral=True)
+                        await interaction.response.edit_message(content="You've been registered successfully.", view=None)
                     except IntegrityError as e:
                         print(e)
-                        await interaction.response.send_message("Something went wrong when trying to register.", ephemeral=True)
+                        await interaction.response.edit_message(content="Something went wrong when trying to register.", view=None)
                     return
 
                 try:
                     self.db.register_player(self.player, interaction.user.id)
-                    await interaction.response.send_message("You've been registered successfully.", ephemeral=True)
+                    await interaction.response.edit_message(content="You've been registered successfully.", view=None)
                 except IntegrityError as e:
                     print(e)
-                    await interaction.response.send_message("Something went wrong when trying to register.", ephemeral=True)
+                    await interaction.response.edit_message(content="Something went wrong when trying to register.", view=None)
             else:
                 print(msg)
-                await interaction.response.send_message('Unexpected message received from ev.io.')
+                await interaction.response.edit_message(content='Unexpected message received from ev.io.', view=None)
 
 
 class Evio(commands.Cog):
@@ -865,9 +879,11 @@ class Evio(commands.Cog):
             await interaction.response.send_message("You're already registered.", ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True)
+
         player = await self.api.get_user_info_by_name(evio_username)
         if not player:
-            await interaction.response.send_message("Couldn't find ev.io user with such username.", ephemeral=True)
+            await interaction.followup.send("Couldn't find ev.io user with such username.", ephemeral=True)
             return
 
         uid = player['uid'][0]['value']
@@ -876,11 +892,11 @@ class Evio(commands.Cog):
         if db_player is not None:
             discord_id = db_player['discord_id']
             if discord_id is not None and discord_id != interaction.user.id:
-                await interaction.response.send_message("The player with this username is already registered.", ephemeral=True)
+                await interaction.followup.send("The player with this username is already registered.", ephemeral=True)
                 return
             is_created = True
 
-        await interaction.response.send_modal(VerifyModal(self.db, player, is_created))
+        await interaction.followup.send(content='Click "Verify" to continue.', view=VerifyView(self.db, player, is_created))
 
 
     @app_commands.command(name='unregister')
