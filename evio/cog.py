@@ -681,7 +681,7 @@ class VerifyModal(ui.Modal):
         self.player = player
         self.db = db
         self.is_created = is_created
-        self.party_code = ui.TextInput(label='Create a party in ev.io and enter your party code', required=True)
+        self.party_code = ui.TextInput(label='Create a party and enter your party code', required=True)
         self.add_item(self.party_code)
 
 
