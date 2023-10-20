@@ -15,6 +15,7 @@ from typing import Any, Coroutine
 from aiohttp import ClientSession, BasicAuth
 from random import choice, shuffle
 from traceback import format_exc
+from table2ascii import table2ascii
 
 from .api import EvioMap, EvioApiClient
 from .db import EvioDB, League, GameMode, DBHistoricalMatch, MatchStatusEnum, MatchmakingRegionEnum
@@ -614,6 +615,60 @@ class HistoryScreen(View):
         self.pos = pos
         await interaction.response.edit_message(content=None, embed=self.render_info(self.matches[pos]))
 
+# ---------------
+
+class LeaderboardScreen(View):
+
+    def __init__(self, db: EvioDB, creator: User, league: League):
+        super().__init__(timeout=None)
+        self.db = db
+        self.creator = creator
+        self.league = league
+        self.pos = 0
+
+
+    async def interaction_check(self, interaction: Interaction[Client]) -> Coroutine[Any, Any, bool]:
+        if interaction.user.id != self.creator.id:
+            await interaction.response.send_message("You cannot use this menu.", ephemeral=True)
+            return False
+        return await super().interaction_check(interaction)
+
+
+    def render_kda(self, player: dict) -> str:
+        # TODO: Need to fix to make consistent
+        if 'kills' not in player or 'deaths' not in player or 'assists' not in player:
+            return ''
+        return f" [{player['kills']}/{player['deaths']}/{player['assists']}]"
+
+    def render_info(self, data: list[dict]) -> Embed:
+        table = table2ascii(
+            header=('#', 'Name', 'MMR', 'K', 'D', 'A'),
+            body=[(player['pos'], player['name'], player['mmr'], player['kills'], player['deaths'], player['assists']) for player in data]
+        )
+        return Embed(title=f'Leaderboard for {self.league.name} league', description=f'```{table}```', color=Color.darker_grey())
+
+
+    @ui.button(label="Previous", style=ButtonStyle.gray)
+    async def previous(self, interaction: Interaction, _: ui.Button):
+        pos = self.pos - 1
+        if pos < 0:
+            await interaction.response.edit_message(content='Cannot navigate past the first page.')
+            return
+        self.pos = pos
+        data = self.db.get_top_10_players(self.league.value, pos, 'p.name', 's.mmr', 's.kills', 's.deaths', 's.assists', 's.won', 's.draw', 's.lost')
+        await interaction.response.edit_message(content=None, embed=self.render_info(data))
+
+
+    @ui.button(label="Next", style=ButtonStyle.gray)
+    async def next(self, interaction: Interaction, _: ui.Button):
+        pos = self.pos + 1
+        data = self.db.get_top_10_players(self.league.value, pos, 'p.name', 's.mmr', 's.kills', 's.deaths', 's.assists', 's.won', 's.draw', 's.lost')
+        if not data:
+            await interaction.response.edit_message(content='Cannot navigate past the last page.')
+            return
+        self.pos = pos
+        await interaction.response.edit_message(content=None, embed=self.render_info(data))
+
 
 class Evio(commands.Cog):
 
@@ -645,13 +700,14 @@ class Evio(commands.Cog):
 
 
     @app_commands.command(name='leaderboard')
-    @app_commands.choices(league=[app_commands.Choice(name=e.name, value=e.value) for e in League])
+    @app_commands.choices(league=[app_commands.Choice(name=e.name, value=e.value) for e in League if e is not League.Custom])
     async def leaderboard(self, interaction: Interaction, league: app_commands.Choice[int]):
         """View leaderboard"""
 
-        data = self.db.get_top_25_players(league.value, 'p.name', 's.mmr')
-        leaderboard = '\n'.join([f'{i}. {player["name"]} - {player["mmr"]}' for i, player in enumerate(data)])
-        await interaction.response.send_message(f'League: {League(league.value).name}\n{leaderboard}')
+        league = League(league.value)
+        view = LeaderboardScreen(self.db, interaction.user, league)
+        data = self.db.get_top_10_players(league.value, 0, 'p.name', 's.mmr', 's.kills', 's.deaths', 's.assists', 's.won', 's.draw', 's.lost')
+        await interaction.response.send_message(view=view, embed=view.render_info(data))
 
 
     @app_commands.command(name='stats')

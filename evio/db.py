@@ -302,8 +302,8 @@ class EvioDB:
         return self.db.execute(f'SELECT {",".join([field for field in fields])} FROM {TABLE_PREFIX}_competitive_stats AS s LEFT JOIN {TABLE_PREFIX}_players AS p ON p.user_id = s.user_id LEFT JOIN {TABLE_PREFIX}_discord_integration AS i ON i.user_id = p.user_id WHERE i.discord_id = ? AND s.league_id = ?', (discord_id, league_id)).fetchone()
 
 
-    def get_top_25_players(self, league_id: int, *fields: str) -> Optional[DBPlayerWithStats]:
-        return self.db.execute(f'SELECT {",".join([field for field in fields])} FROM {TABLE_PREFIX}_competitive_stats AS s LEFT JOIN {TABLE_PREFIX}_players AS p ON p.user_id = s.user_id WHERE s.league_id = ? AND p.deleted_at IS NULL ORDER BY s.mmr DESC LIMIT 25', (league_id,)).fetchall()
+    def get_top_10_players(self, league_id: int, page: int, *fields: str) -> list[DBPlayerWithStats]:
+        return self.db.execute(f'SELECT ROW_NUMBER() OVER (ORDER BY s.mmr DESC) AS pos, {",".join([field for field in fields])} FROM {TABLE_PREFIX}_competitive_stats AS s LEFT JOIN {TABLE_PREFIX}_players AS p ON p.user_id = s.user_id WHERE s.league_id = ? AND p.deleted_at IS NULL LIMIT 10 OFFSET {page * 10}', (league_id,)).fetchall()
 
 
     def get_league_data(self, league_id: int, *fields: str) -> DBLeague:
