@@ -361,6 +361,5 @@ class EvioDB:
         self.db.execute(f'UPDATE {TABLE_PREFIX}_player_settings SET {",".join(query)} WHERE user_id = ?', data)
         self.db.commit()
 
-    # TODO: Pagination
-    def get_player_match_history(self, discord_id: int, start_from: int = 0, limit: int = 25) -> list[DBHistoricalMatch]:
-        return self.db.execute(f'SELECT mh.status, mh.league_id, mh.mode_id, mh.match_id, mh.config, mh.teams, mh.map, mh.region, mh.comment, mh.created_at FROM {TABLE_PREFIX}_matches_history AS mh LEFT JOIN {TABLE_PREFIX}_players_history AS ph ON mh.match_id = ph.match_id LEFT JOIN {TABLE_PREFIX}_discord_integration AS i ON i.user_id = ph.user_id WHERE i.discord_id = ? ORDER BY mh.created_at DESC LIMIT ?', (discord_id, limit)).fetchall()
+    def get_player_match_history(self, discord_id: int, page: int = 0) -> list[DBHistoricalMatch]:
+        return self.db.execute(f'SELECT mh.status, mh.league_id, mh.mode_id, mh.match_id, mh.config, mh.teams, mh.map, mh.region, mh.comment, mh.created_at FROM {TABLE_PREFIX}_matches_history AS mh LEFT JOIN {TABLE_PREFIX}_players_history AS ph ON mh.match_id = ph.match_id LEFT JOIN {TABLE_PREFIX}_discord_integration AS i ON i.user_id = ph.user_id WHERE i.discord_id = ? ORDER BY mh.created_at DESC LIMIT 25 OFFSET {page * 25}', (discord_id,)).fetchall()
