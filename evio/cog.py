@@ -4,7 +4,7 @@ from uuid import uuid4
 from datetime import datetime
 from json import loads
 from sqlite3 import IntegrityError
-from discord import Client, app_commands, Interaction, ui, ButtonStyle, Client, Embed, Color, User, SelectOption, InteractionMessage
+from discord import Client, app_commands, Interaction, ui, ButtonStyle, Client, Embed, Color, User, SelectOption, Message
 from discord.emoji import Emoji
 from discord.enums import ButtonStyle
 from discord.ext import commands
@@ -22,7 +22,7 @@ from .db import EvioDB, League, GameMode, DBHistoricalMatch, MatchStatusEnum, Ma
 
 class MatchmakingLobbyScreen(View):
 
-    def __init__(self, bot: MatchmakingBot, api: EvioApiClient, db: EvioDB, user: User, maps: list[EvioMap], league_id: int, mode_id: int, callback_url: str, discord_message: InteractionMessage, player_settings: dict):
+    def __init__(self, bot: MatchmakingBot, api: EvioApiClient, db: EvioDB, user: User, maps: list[EvioMap], league_id: int, mode_id: int, callback_url: str, player_settings: dict):
         super().__init__(timeout=None)
 
         self.bot = bot
@@ -30,7 +30,7 @@ class MatchmakingLobbyScreen(View):
         self.api = api
         self.creator = user
 
-        self.discord_message = discord_message
+        self.discord_message: Message = None
 
         self.league = League(league_id)
         self.mode = GameMode(mode_id)
@@ -286,14 +286,14 @@ class MMMapSelect(ui.Select['MMMapSelectionScreen']):
 
 class CustomLobbyScreen(View):
 
-    def __init__(self, bot: MatchmakingBot, db: EvioDB, user: User, maps: list[EvioMap], lobby: CustomLobby, lobby_key: str, discord_message: InteractionMessage):
+    def __init__(self, bot: MatchmakingBot, db: EvioDB, user: User, maps: list[EvioMap], lobby: CustomLobby, lobby_key: str):
         super().__init__(timeout=None)
 
         self.bot = bot
         self.creator = user
         self.db = db
 
-        self.discord_message = discord_message
+        self.discord_message: Message = None
 
         self.lobby = lobby
         self.lobby_key = lobby_key
@@ -694,20 +694,20 @@ class Evio(commands.Cog):
     async def find_match(self, interaction: Interaction, league: app_commands.Choice[int], mode: app_commands.Choice[int]):
         """Enqueue and search for the match"""
 
-        await interaction.response.defer(thinking=True)
-
         if any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.lobbies.values()) \
             or any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.matches.values()):
-            await interaction.followup.send("You are already playing in another lobby.", ephemeral=True)
+            await interaction.response.send_message("You are already playing in another lobby.", ephemeral=True)
             return
         player = self.db.get_player_by_discord_id(interaction.user.id, 'p.user_id')
         if not player:
-            await interaction.followup.send('You must register first.', ephemeral=True)
+            await interaction.response.send_message('You must register first.', ephemeral=True)
             return
-        msg = await interaction.original_response()
+
+        await interaction.response.send_message('See the message below', ephemeral=True, silent=True, delete_after=0)
+
         player_settings = self.db.get_player_settings(player['user_id'], 'regions', 'maps')
-        view = MatchmakingLobbyScreen(self.bot, self.api, self.db, interaction.user, self.maps, league.value, mode.value, self.callback_url, msg, player_settings)
-        await interaction.followup.send(embed=view.render_info(), view=view)
+        view = MatchmakingLobbyScreen(self.bot, self.api, self.db, interaction.user, self.maps, league.value, mode.value, self.callback_url, player_settings)
+        view.discord_message = await interaction.channel.send(embed=view.render_info(), view=view)
 
 
     # TODO: Maybe need to restrict custom lobbies to Casual-only. Keeping Competitive for testing only.
@@ -720,24 +720,24 @@ class Evio(commands.Cog):
     async def create_lobby(self, interaction: Interaction, league: app_commands.Choice[int]):
         """Create a local lobby"""
 
-        await interaction.response.defer(thinking=True)
-
         player = self.db.get_player_with_stats(interaction.user.id, league.value, 'p.user_id', 'p.name', 's.mmr')
         if player is None:
-            await interaction.followup.send('You must register first.', ephemeral=True)
+            await interaction.response.send_message('You must register first.', ephemeral=True)
             return
-        msg = await interaction.original_response()
+
+        await interaction.response.send_message('See the message below', ephemeral=True, silent=True, delete_after=0)
 
         # TODO: Refactor
         lobby = CustomLobby(self.api, self.db, self.maps[0], League(league.value), GameMode.Casual, self.callback_url, interaction.user)
         lobby.join(0, player, interaction.user.id)
-        lobby.user_messages[interaction.user.id] = msg
         lobby_key = str(uuid4())
         async with self.bot.lobbies_lock:
             self.bot.lobbies[lobby_key] = lobby
 
-        view = CustomLobbyScreen(self.bot, self.db, interaction.user, self.maps, lobby, lobby_key, msg)
-        await interaction.followup.send(embed=view.lobby.render_info(), view=view)
+        view = CustomLobbyScreen(self.bot, self.db, interaction.user, self.maps, lobby, lobby_key)
+        view.discord_message = await interaction.channel.send(embed=view.lobby.render_info(), view=view)
+
+        lobby.user_messages[interaction.user.id] = view.discord_message
 
 
     @app_commands.command(name='register')
