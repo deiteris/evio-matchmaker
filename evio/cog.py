@@ -14,6 +14,7 @@ from discord.ui import View
 from typing import Any, Coroutine
 from aiohttp import ClientSession, BasicAuth
 from random import choice, shuffle
+from traceback import format_exc
 
 from .api import EvioMap, EvioApiClient
 from .db import EvioDB, League, GameMode, DBHistoricalMatch, MatchStatusEnum, MatchmakingRegionEnum
@@ -69,6 +70,12 @@ class MatchmakingLobbyScreen(View):
         if not lobby.is_empty():
             self.lobby_key = None
             del lobby.user_messages[discord_id]
+            for msg in lobby.user_messages.values():
+                # TODO: Readiness screen
+                try:
+                    await msg.edit(embed=lobby.render_info(True, False))
+                except:
+                    print(format_exc())
             return
         async with self.bot.lobbies_lock:
             del self.bot.lobbies[self.lobby_key]
@@ -86,7 +93,10 @@ class MatchmakingLobbyScreen(View):
             del self.bot.lobbies[self.lobby_key]
         for msg in lobby.user_messages.values():
             # TODO: Readiness screen
-            await msg.edit(content='Match was found!', embed=lobby.render_info(True, False), view=ConnectScreen(match_id))
+            try:
+                await msg.edit(content='Match was found!', embed=lobby.render_info(True, False), view=ConnectScreen(match_id))
+            except:
+                print(format_exc())
 
 
     @ui.button(label="Select map pool", style=ButtonStyle.gray, row=0)

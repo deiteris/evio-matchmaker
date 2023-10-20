@@ -56,7 +56,10 @@ async def timeout_matches():
             del bot.matches[m_id]
             m.cancel()
             for msg in m.user_messages.values():
-                await msg.edit(content='Match has been abandoned. Stats will not be tracked.', view=None)
+                try:
+                    await msg.edit(content='Match has been abandoned. Stats will not be tracked.', view=None)
+                except:
+                    pass
 
 
 @bot.event
@@ -93,11 +96,17 @@ async def matchCallback(req: web.Request):
         # To avoid spam in case there're any issues with the match
         print(format_exc())
         for msg in m.user_messages.values():
-            await msg.edit(content=f'Something went wrong with the match. Please notify @emojikage about the issue.', view=None)
+            try:
+                await msg.edit(content=f'Something went wrong with the match. Please notify @emojikage about the issue.', view=None)
+            except:
+                print(format_exc())
         return web.json_response(status=200)
     embed = m.render_info(True, False)
     for msg in m.user_messages.values():
-        await msg.edit(content=f'Match finished! {res}', embed=embed, view=None)
+        try:
+            await msg.edit(content=f'Match finished! {res}', embed=embed, view=None)
+        except:
+            print(format_exc())
     return web.json_response(status=200)
 
 
