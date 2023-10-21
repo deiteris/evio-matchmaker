@@ -328,7 +328,7 @@ class MatchmakingLobby(AbstractLobby):
     # TODO: Probably needs to be handled by states
     def render_info(self, include_players: bool = False, is_searching: bool = False) -> Embed:
         super().render_info()
-        if self.mode is GameMode.Competitive:
+        if self.mode is GameMode.Competitive and include_players:
             teams_info = f'Team Red ({self.teams[0]["avg_mmr"]}) vs Team Blue ({self.teams[1]["avg_mmr"]})'
         else:
             teams_info = f'Team Red vs Team Blue'

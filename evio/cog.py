@@ -73,12 +73,6 @@ class MatchmakingLobbyScreen(View):
         if not lobby.is_empty():
             self.lobby_key = None
             del lobby.user_messages[discord_id]
-            for msg in lobby.user_messages.values():
-                # TODO: Readiness screen
-                try:
-                    await msg.edit(embed=lobby.render_info(False, True))
-                except:
-                    print(format_exc())
             return
         async with self.bot.lobbies_lock:
             del self.bot.lobbies[self.lobby_key]
