@@ -1,5 +1,6 @@
 {
     "token": "",
     "evio_username": "",
-    "evio_password": ""
+    "evio_password": "",
+    "callback_url": ""
 }
