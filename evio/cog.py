@@ -671,6 +671,13 @@ class LeaderboardScreen(View):
         self.pos = pos
         await interaction.response.edit_message(content=None, embed=self.render_info(data))
 
+
+    @ui.button(label="Close", style=ButtonStyle.red)
+    async def close(self, interaction: Interaction, _: ui.Button):
+        await interaction.response.defer()
+        await interaction.delete_original_response()
+
+
 # -------------
 
 class VerifyView(View):
