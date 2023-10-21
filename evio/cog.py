@@ -76,7 +76,7 @@ class MatchmakingLobbyScreen(View):
             for msg in lobby.user_messages.values():
                 # TODO: Readiness screen
                 try:
-                    await msg.edit(embed=lobby.render_info(True, False))
+                    await msg.edit(embed=lobby.render_info(False, True))
                 except:
                     print(format_exc())
             return
@@ -88,6 +88,11 @@ class MatchmakingLobbyScreen(View):
     async def trigger_lobby_start(self):
         lobby = self.bot.lobbies[self.lobby_key]
         if not lobby.is_full():
+            for msg in lobby.user_messages.values():
+                try:
+                    await msg.edit(embed=lobby.render_info(False, True))
+                except:
+                    print(format_exc())
             return
         match_id = await lobby.start()
         async with self.bot.matches_lock:
