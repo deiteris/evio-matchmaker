@@ -947,6 +947,12 @@ class Evio(commands.Cog):
                         print(format_exc())
                 else:
                     lobby.leave(discord_id)
+                    # Don't forget to update the lobby message
+                    for msg in lobby.user_messages.values():
+                        try:
+                            await msg.edit(embed=lobby.render_info())
+                        except:
+                            print(format_exc())
             case MatchmakingLobby():
                 # Leave lobby unconditionally
                 lobby.leave(discord_id)
