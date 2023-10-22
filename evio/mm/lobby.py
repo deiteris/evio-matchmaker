@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from json import loads
-from discord import Embed, Color, InteractionMessage, User
+from discord import Embed, Color, Message, User
 from typing import Any, TypedDict
 from datetime import datetime
 
@@ -100,7 +100,7 @@ class AbstractLobby(ABC):
 
         # TODO: Maybe there's a better solution rather than making a reverse lookup table?
         self.discord_player_map: dict[int, dict[str, Any]] = {}
-        self.user_messages: dict[int, InteractionMessage] = {}
+        self.user_messages: dict[int, Message] = {}
         self.match_id: str | None = None
         self.created_at = datetime.utcnow()
         self.started_at: datetime | None = None
