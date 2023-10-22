@@ -953,6 +953,10 @@ class Evio(commands.Cog):
             await interaction.response.send_message('You are not registered.', ephemeral=True)
             return
 
+        if any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.matches.values()):
+            await interaction.response.send_message("Cannot unregister while playing in a match.", ephemeral=True)
+            return
+
         await self.leave_lobby(interaction.user.id)
         self.db.remove_player(interaction.user.id)
         await interaction.response.send_message("You've been unregistered successfully.", ephemeral=True)
