@@ -862,6 +862,11 @@ class Evio(commands.Cog):
             await interaction.response.send_message('You must register first.', ephemeral=True)
             return
 
+        if any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.lobbies.values()) \
+            or any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.matches.values()):
+            await interaction.response.send_message("You are already playing in another lobby.", ephemeral=True)
+            return
+
         await interaction.response.send_message('See the message below', ephemeral=True, silent=True, delete_after=0)
 
         # TODO: Refactor
