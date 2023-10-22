@@ -913,6 +913,7 @@ class Evio(commands.Cog):
             await interaction.response.send_message('You are not registered.', ephemeral=True)
             return
 
+        await self.leave_lobby(interaction.user.id)
         self.db.remove_player(interaction.user.id)
         await interaction.response.send_message("You've been unregistered successfully.", ephemeral=True)
 
@@ -925,32 +926,37 @@ class Evio(commands.Cog):
             await interaction.response.send_message('You are not registered.', ephemeral=True)
             return
 
-        kv = next((lobby for lobby in self.bot.lobbies.items() if interaction.user.id in lobby[1].discord_player_map), None)
+        msg = await self.leave_lobby(interaction.user.id)
+        await interaction.response.send_message(msg, ephemeral=True)
+
+
+    async def leave_lobby(self, discord_id: int) -> str:
+        kv = next((lobby for lobby in self.bot.lobbies.items() if discord_id in lobby[1].discord_player_map), None)
         if kv is None:
-            await interaction.response.send_message('You are not present in any lobby.', ephemeral=True)
-            return
+            return 'You are not present in any lobby.'
         lobby_key, lobby = kv
         match lobby:
             case CustomLobby():
                 # If lobby creator is interaction user - delete the lobby. Leave otherwise.
-                if lobby.creator.id == interaction.user.id:
+                if lobby.creator.id == discord_id:
                     async with self.bot.lobbies_lock:
                         del self.bot.lobbies[lobby_key]
                     try:
-                        await lobby.user_messages[interaction.user.id].delete()
+                        await lobby.user_messages[discord_id].delete()
                     except:
                         print(format_exc())
                 else:
-                    lobby.leave(interaction.user.id)
+                    lobby.leave(discord_id)
             case MatchmakingLobby():
                 # Leave lobby unconditionally
-                lobby.leave(interaction.user.id)
+                lobby.leave(discord_id)
+                # Matchmaking lobby messages don't need to be updated since they include anonymized information
                 # Since matchmaking lobbies don't have a creator, keep them until there are no players
                 if len(lobby.discord_player_map) == 0:
                     async with self.bot.lobbies_lock:
                         del self.bot.lobbies[lobby_key]
                 try:
-                    await lobby.user_messages[interaction.user.id].delete()
+                    await lobby.user_messages[discord_id].delete()
                 except:
                     print(format_exc())
-        await interaction.response.send_message("You've been removed from the lobby.", ephemeral=True)
+        return "You've been removed from the lobby."
