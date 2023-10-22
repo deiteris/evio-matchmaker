@@ -70,20 +70,13 @@ class MatchStatusEnum(IntEnum):
         'complete': COMPLETE
     }
 
-    __REVERSE__ = {
-        RUNNING: 'running',
-        PENDING: 'pending',
-        CANCELLED: 'cancelled',
-        COMPLETE: 'complete'
-    }
-
     @classmethod
     def from_value(cls, value: str) -> 'MatchStatusEnum':
         return cls.__MAPPING__[value]
 
     @classmethod
     def to_value(cls, value: 'MatchStatusEnum') -> str:
-        return cls.__REVERSE__[value]
+        return value.name.lower()
 
     def label(value: 'MatchStatusEnum') -> str:
         return value.name.capitalize()
