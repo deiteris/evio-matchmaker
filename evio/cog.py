@@ -1,5 +1,6 @@
 import websockets.client
 import logging
+from asyncio import sleep
 from .mm.lobby import MATCH_INFO_MAP, MMR_DIFF_THRESHOLD, MAPS_POOL, CustomLobby, MatchmakingLobby, get_avg_team_mmr
 from custom_types import MatchmakingBot
 from uuid import uuid4
@@ -769,6 +770,10 @@ class Evio(commands.Cog):
     async def history(self, interaction: Interaction):
         """View your match history"""
 
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         player = self.db.get_player_by_discord_id(interaction.user.id, 'COUNT(1) as count')
         if not player['count']:
             await interaction.response.send_message('You must register first.', ephemeral=True)
@@ -785,6 +790,10 @@ class Evio(commands.Cog):
     async def leaderboard(self, interaction: Interaction, league: app_commands.Choice[int]):
         """View leaderboard"""
 
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         league = League(league.value)
         view = LeaderboardScreen(self.db, interaction.user, league)
         data = self.db.get_top_10_players(league.value, 0, 'p.name', 's.mmr', 's.kills', 's.deaths', 's.assists', 's.won', 's.draw', 's.lost')
@@ -795,6 +804,10 @@ class Evio(commands.Cog):
     @app_commands.choices(league=[app_commands.Choice(name=e.name, value=e.value) for e in League])
     async def stats(self, interaction: Interaction, league: app_commands.Choice[int]):
         """View your statistics"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
 
         player = self.db.get_player_with_stats(interaction.user.id, league.value, 'p.name', 's.mmr', 's.kills', 's.deaths', 's.assists', 's.won', 's.draw', 's.lost')
         if not player:
@@ -820,6 +833,10 @@ class Evio(commands.Cog):
     async def rules(self, interaction: Interaction):
         """View matchmaking rules"""
 
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         await interaction.response.send_message('Not implemented yet', ephemeral=True)
 
 
@@ -830,6 +847,10 @@ class Evio(commands.Cog):
     )
     async def find_match(self, interaction: Interaction, league: app_commands.Choice[int], mode: app_commands.Choice[int]):
         """Enqueue and search for the match"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
 
         if any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.lobbies.values()) \
             or any(interaction.user.id in lobby.discord_player_map for lobby in self.bot.matches.values()):
@@ -856,6 +877,10 @@ class Evio(commands.Cog):
     @app_commands.guild_only()
     async def create_lobby(self, interaction: Interaction, league: app_commands.Choice[int]):
         """Create a local lobby"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
 
         player = self.db.get_player_with_stats(interaction.user.id, league.value, 'p.user_id', 'p.name', 's.mmr')
         if player is None:
@@ -886,6 +911,10 @@ class Evio(commands.Cog):
     async def evio_register(self, interaction: Interaction, *, evio_username: str):
         """Register using your ev.io username"""
 
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         registered_player = self.db.get_player_by_discord_id(interaction.user.id, 'COUNT(1) as count')
         if registered_player['count']:
             await interaction.response.send_message("You're already registered.", ephemeral=True)
@@ -914,6 +943,11 @@ class Evio(commands.Cog):
     @app_commands.command(name='unregister')
     async def evio_unregister(self, interaction: Interaction):
         """Unregister in case you specified wrong ev.io username"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         player = self.db.get_player_by_discord_id(interaction.user.id, 'COUNT(1) as count')
         if not player['count']:
             await interaction.response.send_message('You are not registered.', ephemeral=True)
@@ -927,6 +961,11 @@ class Evio(commands.Cog):
     @app_commands.command(name='leave')
     async def evio_leave(self, interaction: Interaction):
         """Removes from any lobby you currently participate"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
         player = self.db.get_player_by_discord_id(interaction.user.id, 'COUNT(1) as count')
         if not player['count']:
             await interaction.response.send_message('You are not registered.', ephemeral=True)
@@ -972,3 +1011,33 @@ class Evio(commands.Cog):
                 except:
                     logging.error(format_exc())
         return "You've been removed from the lobby."
+
+
+    @app_commands.command(name='shutdown')
+    async def evio_shutdown(self, interaction: Interaction):
+        """Gracefully shuts down the bot"""
+
+        if self.bot.maintenance:
+            await interaction.response.send_message('Bot is going to maintenance mode and is not accepting any commands.', ephemeral=True)
+            return
+
+        if interaction.user.id != self.bot.owner_id:
+            return await interaction.response.send_message('You cannot use this command.', ephemeral=True)
+
+        self.bot.maintenance = True
+
+        await interaction.response.defer(thinking=True, ephemeral=True)
+
+        for lobby in self.bot.lobbies.values():
+            for msg in lobby.user_messages.values():
+                try:
+                    await msg.delete()
+                except:
+                    logging.error(format_exc())
+
+        while len(self.bot.matches):
+            await sleep(1)
+
+        await interaction.followup.send('Shutting down...')
+
+        await self.bot.close()

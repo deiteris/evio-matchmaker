@@ -1,7 +1,6 @@
 import asyncio
 import sqlite3
 import discord
-import ssl
 import logging
 from random import randint
 from datetime import datetime, timedelta
@@ -86,9 +85,7 @@ async def matchCallback(req: web.Request):
         # TODO: Currently, matches don't persist between restarts. Respond with 200 to keep ev.io happy
         return web.json_response(status=200)
 
-    async with bot.matches_lock:
-        m = bot.matches[match_id]
-        del bot.matches[match_id]
+    m = bot.matches[match_id]
 
     try:
         res = m.finish(match_data)
@@ -107,6 +104,10 @@ async def matchCallback(req: web.Request):
             await msg.edit(content=f'Match finished! {res}', embed=embed, view=None)
         except:
             logging.error(format_exc())
+
+    async with bot.matches_lock:
+        del bot.matches[match_id]
+
     return web.json_response(status=200)
 
 
@@ -128,14 +129,20 @@ async def main():
         bot.lobbies = {}
         bot.matches_lock = asyncio.Lock()
         bot.lobbies_lock = asyncio.Lock()
+        bot.maintenance = False
+        bot.owner_id = 277821614345945089
 
         # Initialize db connection
-        bot.db = sqlite3.connect('bot.db')
+        db = sqlite3.connect('bot.db')
+        bot.db = db
         bot.db.execute('PRAGMA foreign_keys=ON')
         bot.db.row_factory = sqlite3.Row
 
         await bot.add_cog(evio.Evio(bot, client, credentials, cfg['callback_url']))
         await bot.start(cfg['token'])
+
+        await client.close()
+        db.close()
 
 if __name__ == '__main__':
     asyncio.run(main())
