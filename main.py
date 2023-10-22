@@ -44,11 +44,11 @@ async def timeout_matches():
             status = data['status']
             # Everyone left at any stage
             if status == 'cancelled':
-                print(f'Match {m.match_id} was cancelled.')
+                logging.info(f'Match {m.match_id} was cancelled.')
                 ids_to_delete.append(m_id)
             # No one has joined the match
             elif status == 'pending' and now - m.started_at > timedelta(minutes=2):
-                print(f'Match {m.match_id} is in pending for more than 2 minutes.')
+                logging.info(f'Match {m.match_id} is in pending for more than 2 minutes.')
                 ids_to_delete.append(m_id)
             await asyncio.sleep(randint(0, 300) / 1000) # Sleep between 0-300ms
         for m_id in ids_to_delete:
@@ -81,7 +81,7 @@ async def matchCallback(req: web.Request):
             player['account'] = int(player['account'])
 
     match_id = match_data['matchId']
-    print(f'Received callback for {match_id}')
+    logging.info(f'Received callback for {match_id}')
     if match_id not in bot.matches:
         # TODO: Currently, matches don't persist between restarts. Respond with 200 to keep ev.io happy
         return web.json_response(status=200)
@@ -94,19 +94,19 @@ async def matchCallback(req: web.Request):
         res = m.finish(match_data)
     except:
         # To avoid spam in case there're any issues with the match
-        print(format_exc())
+        logging.error(format_exc())
         for msg in m.user_messages.values():
             try:
                 await msg.edit(content=f'Something went wrong with the match. Please notify @emojikage about the issue.', view=None)
             except:
-                print(format_exc())
+                logging.error(format_exc())
         return web.json_response(status=200)
     embed = m.render_info(True, False)
     for msg in m.user_messages.values():
         try:
             await msg.edit(content=f'Match finished! {res}', embed=embed, view=None)
         except:
-            print(format_exc())
+            logging.error(format_exc())
     return web.json_response(status=200)
 
 

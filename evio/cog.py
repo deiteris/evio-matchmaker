@@ -1,4 +1,5 @@
 import websockets.client
+import logging
 from .mm.lobby import MATCH_INFO_MAP, MMR_DIFF_THRESHOLD, MAPS_POOL, CustomLobby, MatchmakingLobby, get_avg_team_mmr
 from custom_types import MatchmakingBot
 from uuid import uuid4
@@ -86,7 +87,7 @@ class MatchmakingLobbyScreen(View):
                 try:
                     await msg.edit(embed=lobby.render_info(False, True))
                 except:
-                    print(format_exc())
+                    logging.error(format_exc())
             return
         match_id = await lobby.start()
         async with self.bot.matches_lock:
@@ -98,7 +99,7 @@ class MatchmakingLobbyScreen(View):
             try:
                 await msg.edit(content='Match was found!', embed=lobby.render_info(True, False), view=ConnectScreen(match_id))
             except:
-                print(format_exc())
+                logging.error(format_exc())
 
 
     @ui.button(label="Select map pool", style=ButtonStyle.gray, row=0)
@@ -121,7 +122,7 @@ class MatchmakingLobbyScreen(View):
     async def search(self, interaction: Interaction, _: ui.Button):
         def mmr_over_threshold(member_mmr: int, avg_mmr: int):
             diff = member_mmr - avg_mmr
-            print(f'MM: Rating diff: {diff}')
+            logging.info(f'MM: Rating diff: {diff}')
             return diff > MMR_DIFF_THRESHOLD or diff < -MMR_DIFF_THRESHOLD
 
         if interaction.user.id != self.creator.id:
@@ -151,19 +152,19 @@ class MatchmakingLobbyScreen(View):
                     or lobby.league is not self.league \
                     or lobby.mode is not self.mode:
                     continue
-                print(f'MM: Checking lobby with teams: {lobby.teams}')
+                logging.info(f'MM: Checking lobby with teams: {lobby.teams}')
                 for i, team in enumerate(lobby.teams[:2]):
                     if not lobby.is_team_joinable(i):
-                        print(f'MM: Team {i} is full. Players num: {len(team["players"])}.')
+                        logging.info(f'MM: Team {i} is full. Players num: {len(team["players"])}.')
                         continue
                     if self.mode is GameMode.Competitive:
                         target_avg_mmr = team['avg_mmr']
                         if target_avg_mmr > 0 and mmr_over_threshold(member_mmr, target_avg_mmr):
-                            print(f'MM: Team {i} doesn\'t match MMR requirements. Player MMR: {member_mmr}, their MMR: {target_avg_mmr}')
+                            logging.info(f'MM: Team {i} doesn\'t match MMR requirements. Player MMR: {member_mmr}, their MMR: {target_avg_mmr}')
                             continue
                         enemy_avg_mmr = lobby.teams[int(not i)]['avg_mmr']
                         if enemy_avg_mmr > 0 and mmr_over_threshold(member_mmr, enemy_avg_mmr):
-                            print(f'MM: Enemy team {int(not i)} has too high avg MMR. Player MMR: {member_mmr}, their MMR: {enemy_avg_mmr}')
+                            logging.info(f'MM: Enemy team {int(not i)} has too high avg MMR. Player MMR: {member_mmr}, their MMR: {enemy_avg_mmr}')
                             continue
                     lobby.join(i, member, interaction.user.id)
                     target_lobby = lobby
@@ -171,7 +172,7 @@ class MatchmakingLobbyScreen(View):
                     break
 
         if target_lobby is None:
-            print('MM: No matching lobby found. Creating new lobby.')
+            logging.info('MM: No matching lobby found. Creating new lobby.')
             self.lobby_key = str(uuid4())
             target_lobby = MatchmakingLobby(self.api, self.db, choice(self.map_pool), self.league, self.mode, self.callback_url, self.creator)
             target_lobby.join(0, member, interaction.user.id)
@@ -734,19 +735,19 @@ class VerifyModal(ui.Modal):
                     try:
                         self.db.update_player_registration(self.player['uid'][0]['value'], interaction.user.id)
                         await interaction.response.edit_message(content="You've been registered successfully.", view=None)
-                    except IntegrityError as e:
-                        print(e)
+                    except:
+                        logging.error(format_exc())
                         await interaction.response.edit_message(content="Something went wrong when trying to register.", view=None)
                     return
 
                 try:
                     self.db.register_player(self.player, interaction.user.id)
                     await interaction.response.edit_message(content="You've been registered successfully.", view=None)
-                except IntegrityError as e:
-                    print(e)
+                except:
+                    logging.error(format_exc())
                     await interaction.response.edit_message(content="Something went wrong when trying to register.", view=None)
             else:
-                print(msg)
+                logging.error(f'Unexpected message received from ev.io. Raw message dump: {msg}')
                 await interaction.response.edit_message(content='Unexpected message received from ev.io.', view=None)
 
 
@@ -944,7 +945,7 @@ class Evio(commands.Cog):
                     try:
                         await lobby.user_messages[discord_id].delete()
                     except:
-                        print(format_exc())
+                        logging.error(format_exc())
                 else:
                     lobby.leave(discord_id)
                     # Don't forget to update the lobby message
@@ -952,7 +953,7 @@ class Evio(commands.Cog):
                         try:
                             await msg.edit(embed=lobby.render_info())
                         except:
-                            print(format_exc())
+                            logging.error(format_exc())
             case MatchmakingLobby():
                 # Leave lobby unconditionally
                 lobby.leave(discord_id)
@@ -964,5 +965,5 @@ class Evio(commands.Cog):
                 try:
                     await lobby.user_messages[discord_id].delete()
                 except:
-                    print(format_exc())
+                    logging.error(format_exc())
         return "You've been removed from the lobby."

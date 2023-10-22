@@ -1,3 +1,4 @@
+import logging
 from abc import abstractmethod, ABC
 from json import loads
 from discord import Embed, Color, Message, User
@@ -277,7 +278,7 @@ class AbstractLobby(ABC):
                     diff = get_rating_diff(lobby_player['mmr'], enemy_team_avg_mmr)
                     bonus = get_mmr_bonus(diff, won)
                     mmr_change = (BASE_MMR_RATE + bonus) * sign
-                    print(f'{lobby_player["name"]} / PLACEMENT: {placement} / MMR: {lobby_player["mmr"]} / ENEMY AVG MMR: {enemy_team_avg_mmr} / CHANGE: {mmr_change}')
+                    logging.info(f'{lobby_player["name"]} / PLACEMENT: {placement} / MMR: {lobby_player["mmr"]} / ENEMY AVG MMR: {enemy_team_avg_mmr} / CHANGE: {mmr_change}')
                     # TODO: Need to avoid making player MMR below zero
                     lobby_player['mmr'] += mmr_change
                     change['mmr'] = mmr_change
