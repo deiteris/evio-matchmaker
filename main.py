@@ -136,13 +136,17 @@ async def main():
         db = sqlite3.connect('bot.db')
         bot.db = db
         bot.db.execute('PRAGMA foreign_keys=ON')
+        bot.db.execute('PRAGMA journal_mode=WAL')
+        bot.db.execute('PRAGMA synchronous=normal')
+        bot.db.execute('PRAGMA journal_size_limit=67110000')
         bot.db.row_factory = sqlite3.Row
 
         await bot.add_cog(evio.Evio(bot, client, credentials, cfg['callback_url']))
         await bot.start(cfg['token'])
 
         await client.close()
-        db.close()
+        bot.db.execute('PRAGMA optimize')
+        bot.db.close()
 
 if __name__ == '__main__':
     asyncio.run(main())
